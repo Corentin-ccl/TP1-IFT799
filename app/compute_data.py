@@ -62,10 +62,7 @@ def distance_intraClasse(data, distance_function):
     data_values = numeric_data.values
     func_name = distance_function.__name__
     
-    if func_name == 'distance_cosine':
-        data_values = data_values / np.linalg.norm(data_values, axis=1, keepdims=True)
-        mean_vector = np.mean(data_values, axis=0)
-    elif func_name == 'distance_mahalanobis':
+    if func_name == 'distance_mahalanobis':
         mean_vector = np.mean(data_values, axis=0)
         covariance_matrix = np.cov(data_values.T)
     else:
@@ -83,9 +80,6 @@ def distance_intraClasse(data, distance_function):
     
     return np.max(intra_class_distances)
 
-def distance_interClasse(data_class1, data_class2, distance_function):
-    import numpy as np
-import pandas as pd
 
 def distance_interClasse(data_class1, data_class2, distance_function):
     """
@@ -130,51 +124,118 @@ def distance_interClasse(data_class1, data_class2, distance_function):
     return min(dist_c1_c2, dist_c2_c1)
 
 
-def overlap_coefficient(data, labels):
+def overlap_coefficient(data_class1, data_class2, distance_function):
     """
-    Calcule le coefficient de chevauchement entre les classes dans les données.
-
+    Calcule l'indicateur de superposition (Overlap) entre les classes dans les données.
+    
     Parameters:
-    data (pd.DataFrame): Les données d'entrée.
-    labels (pd.Series): Les étiquettes de classe correspondantes.
+    data_class1 (pd.DataFrame): Les données de la première classe.
+    data_class2 (pd.DataFrame): Les données de la deuxième classe.
+    distance_function (function): La fonction de distance à utiliser.
 
     Returns:
-    dict: Un dictionnaire contenant les coefficients de chevauchement pour chaque paire de classes.
+    float: Le coefficient de chevauchement entre les deux classes.
     """
-    unique_labels = np.unique(labels)
-    overlap_coefficients = {}
+
+    dist_intra_c1 = distance_intraClasse(data_class1, distance_function)
+    dist_intra_c2 = distance_intraClasse(data_class2, distance_function)
+
+    dist_inter_c1_c2 = distance_interClasse(data_class1, data_class2, distance_function)
+
+    if dist_inter_c1_c2 == 0:
+        overlap = float('inf')
+    else:
+        overlap = (dist_intra_c1 + dist_intra_c2) / (2 * dist_inter_c1_c2)
+
+    return overlap
+           
+
+def tab_result(file_list, output_file="resultats_distance.csv"):
+    """
+    Crée un tableau de résultats contenant les distances intra-classe et inter-classe pour chaque paire de classes.
+
+    Parameters:
+    file_list (list): Une liste de chemins vers les fichiers de données.
+    output_file (str): Le nom du fichier de sortie.
+
+    Returns:
+    pd.DataFrame: Un DataFrame contenant les résultats.
+    """
+    results = []
+    distance_functions = ["distance_euclidienne", "distance_mahalanobis", "distance_cosine"]
+    class_list = ['PRAD', 'BRCA', 'KIRC', 'COAD', 'LUAD']
     
-    for i in range(len(unique_labels)):
-        for j in range(i + 1, len(unique_labels)):
-            class1_data = data[labels == unique_labels[i]]
-            class2_data = data[labels == unique_labels[j]]
-            
-            # Calcul du coefficient de chevauchement
-            overlap = np.sum(np.minimum(class1_data, class2_data)) / np.sum(np.maximum(class1_data, class2_data))
-            overlap_coefficients[(unique_labels[i], unique_labels[j])] = overlap
-    
-    return overlap_coefficients
+    for file_path in file_list:
+        if os.path.exists(file_path):
+            data = pd.read_csv(file_path)
+
+            for distance_function in distance_functions:
+                intra_distances = {}
+                inter_distances = {}
+                overlap_coeffs = {}
+
+                for className in class_list:
+                    class_data = data[data['Class'] == className]
+                    intra_distance = distance_intraClasse(class_data, distance_function)
+                    intra_distances[className] = intra_distance
+
+                for i in range(len(class_list)):
+                    for j in range(i + 1, len(class_list)):
+                        class1_data = data[data['Class'] == class_list[i]]
+                        class2_data = data[data['Class'] == class_list[j]]
+                        inter_distance = distance_interClasse(class1_data, class2_data, distance_function)
+                        inter_distances[(class_list[i], class_list[j])] = inter_distance
+
+                results.append({
+                    'File': os.path.basename(file_path),
+                    'DistanceFunction': distance_function.__name__,
+                    'IntraDistances': intra_distances,
+                    'InterDistances': inter_distances
+                })
+
+    for i in range(len(class_list)):
+        class1_data = data[data['Class'] == class_list[i]]
+        intra_distance = distance_intraClasse(class1_data, distance_function)
+
+        for j in range(i + 1, len(class_list)):
+            class2_data = data[data['Class'] == class_list[j]]
+            inter_distance = distance_interClasse(class1_data, class2_data, distance_function)
+
+            results.append({
+                'Class1': class_list[i],
+                'Class2': class_list[j],
+                'IntraDistance_Class1': intra_distance,
+                'IntraDistance_Class2': distance_intraClasse(class2_data, distance_function),
+                'InterDistance': inter_distance
+            })
+
+    return pd.DataFrame(results)
 
 
 if __name__ == "__main__":
     data_path="C:\\travail\\Sherbrooke\\ScienceDesDonnees\\tp\\TP1\\TP1-IFT799\\data\\prepared_data_BRCA.csv"
     list_data_path= os.listdir("C:\\travail\\Sherbrooke\\ScienceDesDonnees\\tp\\TP1\\TP1-IFT799\\data")
-    list_distances = ['distance_euclidienne', 'distance_mahalanobis', 'distance_cosine']
-    for file_name in list_data_path:
-        if file_name.startswith("prepared_data_") and file_name.endswith(".csv"):
-            data_path = os.path.join("C:\\travail\\Sherbrooke\\ScienceDesDonnees\\tp\\TP1\\TP1-IFT799\\data", file_name)
-            if os.path.exists(data_path):
-                data = pd.read_csv(data_path)
-                print(f"Calcul des distances intra-classe pour {file_name}:")
-                print(data.head())
-                print(data.shape)
-                result = distance_intraClasse(data, distance_function=distance_euclidienne)
-                print(result)
-                print("----------------------------------------------------------------------------------------------------------")
+    list_distances = ['distance_euclidienne', 'distance_mahalanobis']
+    # for file_name in list_data_path:
+    #     if file_name.startswith("prepared_data_") and file_name.endswith(".csv"):
+    #         data_path = os.path.join("C:\\travail\\Sherbrooke\\ScienceDesDonnees\\tp\\TP1\\TP1-IFT799\\data", file_name)
+    #         if os.path.exists(data_path):
+    #             data = pd.read_csv(data_path)
+    #             print(f"Calcul des distances intra-classe pour {file_name}:")
+    #             print(data.head())
+    #             print(data.shape)
+    #             result = distance_intraClasse(data, distance_function=distance_euclidienne)
+    #             print(result)
+    #             print("----------------------------------------------------------------------------------------------------------")
     data_path1="C:\\travail\\Sherbrooke\\ScienceDesDonnees\\tp\\TP1\\TP1-IFT799\\data\\prepared_data_BRCA.csv"
     data_path2="C:\\travail\\Sherbrooke\\ScienceDesDonnees\\tp\\TP1\\TP1-IFT799\\data\\prepared_data_PRAD.csv"
     data1 = pd.read_csv(data_path1)
     data2 = pd.read_csv(data_path2)
     print(f"Calcul des distances inter-classe pour BRCA et PRAD:")
-    result = distance_interClasse(data1, data2, distance_function=distance_euclidienne)
-    print(result)
+    result_intra = distance_intraClasse(data1, distance_function=distance_mahalanobis)
+    print(f"Distance intra-classe pour BRCA: {result_intra}")
+    # result = distance_interClasse(data1, data2, distance_function=distance_mahalanobis)
+    # print(result)
+    # result_overlap = overlap_coefficient(data1, data2, distance_function=distance_mahalanobis)
+    # print(f"Calcul de l'indicateur de superposition (Overlap) pour BRCA et PRAD:")
+    # print(result_overlap)
