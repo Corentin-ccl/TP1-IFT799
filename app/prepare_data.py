@@ -95,6 +95,13 @@ def separate_features_and_labels(data, label_column):
     
     return features, labels
 
+def reduce_dim_random(df, n):
+    out = pd.DataFrame()
+    out['Unnamed: 0'] = df['Unnamed: 0']
+    out['Class']      = df['Class']
+    keep = np.random.choice(df.columns, n, replace=False)
+    out = pd.concat([out, df[keep]], axis=1)
+    return out
 
 
 if __name__ == "__main__":

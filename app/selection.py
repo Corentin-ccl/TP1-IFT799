@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import itertools
 
+from compute_data import overlap_coefficient, distance_euclidienne
+
 # Source : https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html
 from sklearn.decomposition import PCA
 
@@ -10,71 +12,102 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
 
+def find_best_pair(df, class1, class2):
+    columns = df.columns.drop(['Unnamed: 0', 'Class'])
+    class1_data = df[df['Class'] == class1][columns]
+    class2_data = df[df['Class'] == class2][columns]
+
+    best_col_1     = None
+    best_overlap_1 = float('inf')
+    for col in columns:
+        overlap = overlap_coefficient(class1_data[[col]], class2_data[[col]], distance_euclidienne)
+        if overlap < best_overlap_1:
+            best_overlap_1 = overlap
+            best_col_1 = col
+
+    best_col_2     = None
+    best_overlap_2 = float('inf')
+    for col in columns:
+        if col == best_col_1:
+            continue
+        overlap = overlap_coefficient(class1_data[[best_col_1, col]], class2_data[[best_col_1, col]], distance_euclidienne)
+        if overlap < best_overlap_2:
+            best_overlap_2 = overlap
+            best_col_2 = col
+
+    return (best_col_1, best_col_2), best_overlap_2
+
+
+# Pareil que au dessus mais on compare les moyennes pour toutes les paires de classes
+def find_best_pair_global(df):
+    columns = df.columns.drop(['Unnamed: 0', 'Class'])
+
+    class_pairs = list(itertools.combinations(df['Class'].unique(), 2))
+
+    best_col_1     = None
+    best_overlap_1 = float('inf')
+    for col in columns:
+        overlap_sum = 0
+        for class1, class2 in class_pairs:
+            class1_data = df[df['Class'] == class1][[col]]
+            class2_data = df[df['Class'] == class2][[col]]
+
+            overlap = overlap_coefficient(class1_data, class2_data, distance_euclidienne)
+
+            overlap_sum += overlap
+        global_overlap = overlap_sum / len(class_pairs)
+
+        if global_overlap < best_overlap_1:
+            best_overlap_1 = global_overlap
+            best_col_1 = col
+
+    best_col_2     = None
+    best_overlap_2 = float('inf')
+    for col in columns:
+        if col == best_col_1:
+            continue
+        overlap_sum = 0
+        for class1, class2 in class_pairs:
+            class1_data = df[df['Class'] == class1][[best_col_1, col]]
+            class2_data = df[df['Class'] == class2][[best_col_1, col]]
+
+            overlap = overlap_coefficient(class1_data, class2_data, distance_euclidienne)
+
+            overlap_sum += overlap
+        global_overlap = overlap_sum / len(class_pairs)
+
+        if global_overlap < best_overlap_2:
+            best_overlap_2 = global_overlap
+            best_col_2 = col
+
+    return (best_col_1, best_col_2), best_overlap_2
+    
+
+
 def acp(df, n=15):
+    df = df.drop(columns=['Unnamed: 0', 'Class'], errors='ignore')
     pca = PCA(n_components=n)
     cp  = pca.fit_transform(df)
     return pd.DataFrame(cp, columns=[f'PC{i+1}' for i in range(n)])
 
 
-def iter_acp(df, labels, n, pairs):
-    results = {}
-    results['global'] = acp(df, n)
-    results['global']['Class'] = labels['Class'].to_numpy()
-
-    for pair in pairs:
-        mask = labels['Class'].isin(pair)
-        key = f'{pair[0]}-{pair[1]}'
-        results[key] = acp(df[mask], n)
-        results[key]['Class'] = labels.loc[mask, 'Class'].to_numpy()
-
-    return results
-
-
-def best_2_cp_acp(df_acp, labels):
-    cp_pairs = list(itertools.combinations(df_acp.columns, 2))
-
-    best_pair = None
-    best_overlap = float('inf')
-    for pair in cp_pairs:
-        cp_data = df_acp[list(pair)].to_numpy()
-        overlap = ...
-        if overlap < best_overlap:
-            best_overlap = overlap
-            best_pair = pair
-
-    return best_pair
-
-
-def show_acp(key, df_acp):
-    best_pair = best_2_cp_acp(df_acp.drop(columns='Class'), df_acp['Class'])
-
-    plt.figure()
-    for tumor in df_acp['Class'].unique():
-        points = df_acp[df_acp['Class'] == tumor]
-        plt.scatter(points[best_pair[0]], points[best_pair[1]], label=tumor)
-    plt.title(f'ACP: {key}')
-    plt.xlabel(f'{best_pair[0]}')
-    plt.ylabel(f'{best_pair[1]}')
-    plt.legend()
-    plt.show()
-
-
 def tsne(df, n=2):
+    df = df.drop(columns=['Unnamed: 0', 'Class'], errors='ignore')
     t_sne = TSNE(n_components=n)
     cp    = t_sne.fit_transform(df)
     return pd.DataFrame(cp, columns=[f'tSNE{i+1}' for i in range(n)])
 
 
-def iter_tsne(df, labels, n, pairs):
+def iter_method(df, pairs, method=acp, n=15):
     results = {}
-    results['global'] = tsne(df, n)
-    results['global']['Class'] = labels['Class'].to_numpy()
+    results['global'] = method(df, n)
+    results['global']['Class'] = df['Class'].to_numpy()
 
     for pair in pairs:
-        mask = labels['Class'].isin(pair)
+        mask = df['Class'].isin(pair)
         key = f'{pair[0]}-{pair[1]}'
-        results[key] = tsne(df[mask], n)
-        results[key]['Class'] = labels.loc[mask, 'Class'].to_numpy()
+        results[key] = method(df[mask], n)
+        results[key]['Class'] = df.loc[mask, 'Class'].to_numpy()
 
     return results
 
