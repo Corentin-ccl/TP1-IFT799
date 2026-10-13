@@ -1,9 +1,9 @@
 import pandas as pd
-import numpy as np
 import itertools
 
 from prepare_data import reduce_dim_random
 from selection import find_best_pair, find_best_pair_global, show, acp, find_best_n_acp, tsne, iter_method
+from compute_data import overlap_coefficient, distance_euclidienne
 
 N_COLS = 200
 DATA_FOLDER = '../data/'
@@ -56,4 +56,6 @@ for key, df_acp in acp_data.items():
 # t-SNE
 tsne_data = iter_method(df, pairs, method=tsne, n=2)
 for key, df_tsne in tsne_data.items():
+    overlap = overlap_coefficient(df_tsne[df_tsne['Class'] == df_tsne['Class'].unique()[0]][['tSNE1', 'tSNE2']], df_tsne[df_tsne['Class'] == df_tsne['Class'].unique()[1]][['tSNE1', 'tSNE2']], distance_euclidienne)
+    print(f't-SNE: {key} - Overlap: {overlap}')
     show(df_tsne, f't-SNE: {key}', 'tSNE1', 'tSNE2')
