@@ -67,6 +67,15 @@ def get_data_from_class(data, labels, target_class):
     
     return class_data
 
+def reduce_dim_random(df, n):
+    out = pd.DataFrame()
+    out['Unnamed: 0'] = df['Unnamed: 0']
+    out['Class']      = df['Class']
+    keep = np.random.choice(df.columns, n, replace=False)
+    out = pd.concat([out, df[keep]], axis=1)
+    return out
+
+
 if __name__ == "__main__":
     data_path1="basedir\\data\\data.csv"
     data_path2="basedir\\data\\labels.csv"
