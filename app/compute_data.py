@@ -45,9 +45,17 @@ def distance_mahalanobis(point1, point2, covariance_matrix):
 
 
 def distance_intraClasse(data, distance_function):
-    func_name = distance_function.__name__
+    """
+    Calcule la distance intra-classe pour un ensemble de données donné en utilisant une fonction de distance spécifiée.
 
-    
+    Parameters:
+    data (pd.DataFrame): Les données de la classe.
+    distance_function (function): La fonction de distance à utiliser.
+
+    Returns:
+    float: La distance intra-classe maximale.
+    """
+    func_name = distance_function.__name__
     numeric_data = data.select_dtypes(include='number')
 
     if func_name == 'distance_mahalanobis':
@@ -84,6 +92,14 @@ def distance_intraClasse(data, distance_function):
 def distance_interClasse(data_class1, data_class2, distance_function):
     """
     Calcule la distance inter-classe entre deux classes de données.
+
+    Parameters:
+    data_class1 (pd.DataFrame): Les données de la première classe.
+    data_class2 (pd.DataFrame): Les données de la deuxième classe.
+    distance_function (function): La fonction de distance à utiliser.
+
+    Returns:
+    float: La distance inter-classe entre les deux classes.
     """
     dfclass1 = data_class1.select_dtypes(include='number')
     dfclass2 = data_class2.select_dtypes(include='number')
@@ -158,6 +174,15 @@ def overlap_coefficient(data_class1, data_class2, distance_function):
            
 
 def tab_result( output_file="resultats_distance.csv"):
+    """
+    Crée un tableau de résultats contenant les distances intra-classe, inter-classe et l'overlap pour différentes classes et méthodes de distance.
+    
+    Parameters:
+    output_file (str): Le chemin du fichier de sortie pour sauvegarder le tableau de résultats
+    
+    Returns:
+    pd.DataFrame: Le tableau de résultats contenant les distances et l'overlap pour chaque combinaison de classes et de méthodes de distance."""
+
     results = []
     
     distance_functions = [distance_euclidienne, distance_mahalanobis]
