@@ -1,4 +1,3 @@
-import os
 import pandas as pd
 import numpy as np
 
@@ -29,42 +28,51 @@ def distance_mahalanobis(point1, point2, covariance_matrix):
     float: La distance de Mahalanobis entre les deux points.
     """
     diff = point1 - point2
-    inv_cov_matrix = np.linalg.inv(covariance_matrix)
-    return np.sqrt(np.dot(np.dot(diff.T, inv_cov_matrix), diff))
+    shape_cov = covariance_matrix.shape
+    if len(shape_cov) != 2 or shape_cov[0] != shape_cov[1]:
+        inv_cov_matrix = np.linalg.pinv(covariance_matrix)
+        
+    else:
+        try:
+            inv_cov_matrix = np.linalg.inv(covariance_matrix)
+        except np.linalg.LinAlgError:
+            inv_cov_matrix = np.linalg.pinv(covariance_matrix)
 
-def distance_cosine(point1, point2):
-    """
-    Calcule la distance cosinus entre deux points.
+    dist = np.sqrt(np.dot(np.dot(diff.T, inv_cov_matrix), diff))
+    dist_carre = max(0.0, dist)
 
-    Parameters:
-    point1 (np.ndarray): Le premier point.
-    point2 (np.ndarray): Le deuxième point.
+    return np.sqrt(dist_carre)
 
-    Returns:
-    float: La distance cosinus entre les deux points.
-    """
-    dot_product = np.dot(point1, point2)
-    norm_point1 = np.linalg.norm(point1)
-    norm_point2 = np.linalg.norm(point2)
-    
-    if norm_point1 == 0 or norm_point2 == 0:
-        return 0.0  # Évite la division par zéro
-    
-    cosine_similarity = dot_product / (norm_point1 * norm_point2)
-    return 1 - cosine_similarity  # Distance cosinus
 
 def distance_intraClasse(data, distance_function):
+    """
+    Calcule la distance intra-classe pour un ensemble de données donné en utilisant une fonction de distance spécifiée.
+
+    Parameters:
+    data (pd.DataFrame): Les données de la classe.
+    distance_function (function): La fonction de distance à utiliser.
+
+    Returns:
+    float: La distance intra-classe maximale.
+    """
+    func_name = distance_function.__name__
     numeric_data = data.select_dtypes(include='number')
-    
+
+    if func_name == 'distance_mahalanobis':
+        n_samples = numeric_data.shape[0]
+        n_cols = max(1, n_samples - 10)
+        if n_cols < numeric_data.shape[1]:
+            np.random.seed(42)
+            colonnes_aleatoires = np.random.choice(numeric_data.columns, size=n_cols, replace=False)
+            numeric_data = numeric_data[colonnes_aleatoires]
+
     if len(numeric_data) <= 1:
         return 0.0
-
     data_values = numeric_data.values
-    func_name = distance_function.__name__
     
     if func_name == 'distance_mahalanobis':
         mean_vector = np.mean(data_values, axis=0)
-        covariance_matrix = np.cov(data_values.T)
+        covariance_matrix = np.cov(data_values.T) 
     else:
         mean_vector = np.mean(data_values, axis=0)
 
@@ -84,15 +92,30 @@ def distance_intraClasse(data, distance_function):
 def distance_interClasse(data_class1, data_class2, distance_function):
     """
     Calcule la distance inter-classe entre deux classes de données.
+
+    Parameters:
+    data_class1 (pd.DataFrame): Les données de la première classe.
+    data_class2 (pd.DataFrame): Les données de la deuxième classe.
+    distance_function (function): La fonction de distance à utiliser.
+
+    Returns:
+    float: La distance inter-classe entre les deux classes.
     """
-    val_c1 = data_class1.select_dtypes(include='number').values
-    val_c2 = data_class2.select_dtypes(include='number').values
+    dfclass1 = data_class1.select_dtypes(include='number')
+    dfclass2 = data_class2.select_dtypes(include='number')
     func_name = distance_function.__name__
-    
-    if func_name == 'distance_cosine':
-        val_c1 = val_c1 / np.linalg.norm(val_c1, axis=1, keepdims=True)
-        val_c2 = val_c2 / np.linalg.norm(val_c2, axis=1, keepdims=True)
-        
+
+    if func_name == 'distance_mahalanobis':
+        n_samples = min(dfclass1.shape[0], dfclass2.shape[0])
+        n_cols = max(1, n_samples - 1)
+        if n_cols < dfclass1.shape[1]:
+            np.random.seed(42)
+            colonnes_aleatoires = np.random.choice(dfclass1.columns, size=n_cols, replace=False)
+            dfclass1 = dfclass1[colonnes_aleatoires]
+            dfclass2 = dfclass2[colonnes_aleatoires]
+
+    val_c1 = dfclass1.values
+    val_c2 = dfclass2.values
     center1 = np.mean(val_c1, axis=0)
     center2 = np.mean(val_c2, axis=0)
     
@@ -150,92 +173,58 @@ def overlap_coefficient(data_class1, data_class2, distance_function):
     return overlap
            
 
-def tab_result(file_list, output_file="resultats_distance.csv"):
+def tab_result( output_file="resultats_distance.csv"):
     """
-    Crée un tableau de résultats contenant les distances intra-classe et inter-classe pour chaque paire de classes.
-
-    Parameters:
-    file_list (list): Une liste de chemins vers les fichiers de données.
-    output_file (str): Le nom du fichier de sortie.
-
-    Returns:
-    pd.DataFrame: Un DataFrame contenant les résultats.
-    """
-    results = []
-    distance_functions = ["distance_euclidienne", "distance_mahalanobis", "distance_cosine"]
-    class_list = ['PRAD', 'BRCA', 'KIRC', 'COAD', 'LUAD']
+    Crée un tableau de résultats contenant les distances intra-classe, inter-classe et l'overlap pour différentes classes et méthodes de distance.
     
-    for file_path in file_list:
-        if os.path.exists(file_path):
-            data = pd.read_csv(file_path)
+    Parameters:
+    output_file (str): Le chemin du fichier de sortie pour sauvegarder le tableau de résultats
+    
+    Returns:
+    pd.DataFrame: Le tableau de résultats contenant les distances et l'overlap pour chaque combinaison de classes et de méthodes de distance."""
 
-            for distance_function in distance_functions:
-                intra_distances = {}
-                inter_distances = {}
-                overlap_coeffs = {}
+    results = []
+    
+    distance_functions = [distance_euclidienne, distance_mahalanobis]
+    class_list = ["BRCA", "PRAD", "KIRC", "LUAD", "COAD"]
 
-                for className in class_list:
-                    class_data = data[data['Class'] == className]
-                    intra_distance = distance_intraClasse(class_data, distance_function)
-                    intra_distances[className] = intra_distance
+    class_data_dict = {}
+    for class_name in class_list:
+        file_path = f"basedir\\data\\prepared_data_{class_name}.csv"
+        class_data_dict[class_name] = pd.read_csv(file_path)
+    for dist_func in distance_functions:
+        func_name = dist_func.__name__
 
-                for i in range(len(class_list)):
-                    for j in range(i + 1, len(class_list)):
-                        class1_data = data[data['Class'] == class_list[i]]
-                        class2_data = data[data['Class'] == class_list[j]]
-                        inter_distance = distance_interClasse(class1_data, class2_data, distance_function)
-                        inter_distances[(class_list[i], class_list[j])] = inter_distance
-
+        for i in range(len(class_list)):
+            for j in range(i + 1, len(class_list)):
+                c1_name = class_list[i]
+                c2_name = class_list[j]
+                
+                data_c1 = class_data_dict[c1_name]
+                data_c2 = class_data_dict[c2_name]
+                
+                dist_intra_c1 = distance_intraClasse(data_c1, dist_func)
+                dist_intra_c2 = distance_intraClasse(data_c2, dist_func)
+                dist_inter = distance_interClasse(data_c1, data_c2, dist_func)
+                overlap = overlap_coefficient(data_c1, data_c2, dist_func)
+                
                 results.append({
-                    'File': os.path.basename(file_path),
-                    'DistanceFunction': distance_function.__name__,
-                    'IntraDistances': intra_distances,
-                    'InterDistances': inter_distances
+                    'Methode_Distance': func_name,
+                    'Classe_1': c1_name,
+                    'Classe_2': c2_name,
+                    'Intra_Classe_1': dist_intra_c1,
+                    'Intra_Classe_2': dist_intra_c2,
+                    'Inter_Classe': dist_inter,
+                    'Overlap': overlap
                 })
-
-    for i in range(len(class_list)):
-        class1_data = data[data['Class'] == class_list[i]]
-        intra_distance = distance_intraClasse(class1_data, distance_function)
-
-        for j in range(i + 1, len(class_list)):
-            class2_data = data[data['Class'] == class_list[j]]
-            inter_distance = distance_interClasse(class1_data, class2_data, distance_function)
-
-            results.append({
-                'Class1': class_list[i],
-                'Class2': class_list[j],
-                'IntraDistance_Class1': intra_distance,
-                'IntraDistance_Class2': distance_intraClasse(class2_data, distance_function),
-                'InterDistance': inter_distance
-            })
-
-    return pd.DataFrame(results)
+    df_results = pd.DataFrame(results)
+    
+    if not df_results.empty:
+        df_results.to_csv(output_file, index=False)
+        print(f"Tableau de {len(df_results)} lignes sauvegardé avec succès dans : {output_file}")
+        
+    return df_results
 
 
 if __name__ == "__main__":
-    data_path="C:\\travail\\Sherbrooke\\ScienceDesDonnees\\tp\\TP1\\TP1-IFT799\\data\\prepared_data_BRCA.csv"
-    list_data_path= os.listdir("C:\\travail\\Sherbrooke\\ScienceDesDonnees\\tp\\TP1\\TP1-IFT799\\data")
-    list_distances = ['distance_euclidienne', 'distance_mahalanobis']
-    # for file_name in list_data_path:
-    #     if file_name.startswith("prepared_data_") and file_name.endswith(".csv"):
-    #         data_path = os.path.join("C:\\travail\\Sherbrooke\\ScienceDesDonnees\\tp\\TP1\\TP1-IFT799\\data", file_name)
-    #         if os.path.exists(data_path):
-    #             data = pd.read_csv(data_path)
-    #             print(f"Calcul des distances intra-classe pour {file_name}:")
-    #             print(data.head())
-    #             print(data.shape)
-    #             result = distance_intraClasse(data, distance_function=distance_euclidienne)
-    #             print(result)
-    #             print("----------------------------------------------------------------------------------------------------------")
-    data_path1="C:\\travail\\Sherbrooke\\ScienceDesDonnees\\tp\\TP1\\TP1-IFT799\\data\\prepared_data_BRCA.csv"
-    data_path2="C:\\travail\\Sherbrooke\\ScienceDesDonnees\\tp\\TP1\\TP1-IFT799\\data\\prepared_data_PRAD.csv"
-    data1 = pd.read_csv(data_path1)
-    data2 = pd.read_csv(data_path2)
-    print(f"Calcul des distances inter-classe pour BRCA et PRAD:")
-    result_intra = distance_intraClasse(data1, distance_function=distance_mahalanobis)
-    print(f"Distance intra-classe pour BRCA: {result_intra}")
-    # result = distance_interClasse(data1, data2, distance_function=distance_mahalanobis)
-    # print(result)
-    # result_overlap = overlap_coefficient(data1, data2, distance_function=distance_mahalanobis)
-    # print(f"Calcul de l'indicateur de superposition (Overlap) pour BRCA et PRAD:")
-    # print(result_overlap)
+    tab_result(output_file="resultats_distance.csv")

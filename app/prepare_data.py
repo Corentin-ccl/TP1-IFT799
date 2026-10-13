@@ -29,15 +29,6 @@ def segmentation_csv(data, lignes_par_fichier=5):
         output_file = os.path.join(output_dir, f"partie_{numero_fichier}.csv")
         chunk.to_csv(output_file, index=False)
 
-def concat_horizontal_sans_premiere_colonne(df1, df2):
-    """
-    Colle deux DataFrames côte à côte en retirant la première colonne du df2.
-    """
-    df2_modifie = df2.iloc[:, 1:]
-    joined_df = pd.concat([df1, df2_modifie], axis=1)
-    
-    return joined_df
-
 def join_dfs_on_column(df1, df2, column_name):
     """
     Joins two DataFrames on a specified column.
@@ -54,7 +45,7 @@ def join_dfs_on_column(df1, df2, column_name):
         raise ValueError(f"Both DataFrames must contain the column '{column_name}'.")
 
     joined_df = pd.merge(df1, df2, on=column_name)
-    
+
     return joined_df
 
 def get_data_from_class(data, labels, target_class):
@@ -76,25 +67,6 @@ def get_data_from_class(data, labels, target_class):
     
     return class_data
 
-def separate_features_and_labels(data, label_column):
-    """
-    Sépare les caractéristiques (features) et les étiquettes (labels) dans un DataFrame.
-
-    Parameters:
-    data (pd.DataFrame): Le DataFrame contenant les données.
-    label_column (str): Le nom de la colonne contenant les étiquettes.
-
-    Returns:
-    tuple: Un tuple contenant deux DataFrames : (features, labels).
-    """
-    if label_column not in data.columns:
-        raise ValueError(f"La colonne '{label_column}' n'existe pas dans le DataFrame.")
-
-    features = data.drop(columns=[label_column])
-    labels = data[label_column]
-    
-    return features, labels
-
 def reduce_dim_random(df, n):
     out = pd.DataFrame()
     out['Unnamed: 0'] = df['Unnamed: 0']
@@ -105,8 +77,8 @@ def reduce_dim_random(df, n):
 
 
 if __name__ == "__main__":
-    data_path1="C:\\travail\\Sherbrooke\\ScienceDesDonnees\\tp\\TP1\\TP1-IFT799\\data\\data.csv"
-    data_path2="C:\\travail\\Sherbrooke\\ScienceDesDonnees\\tp\\TP1\\TP1-IFT799\\data\\labels.csv"
+    data_path1="basedir\\data\\data.csv"
+    data_path2="basedir\\data\\labels.csv"
 
     if os.path.exists(data_path1) and os.path.isfile(data_path2):
         class_list=['PRAD', 'BRCA', 'KIRC', 'COAD', 'LUAD']
@@ -120,5 +92,5 @@ if __name__ == "__main__":
             print(f"Data for class {class_name}:")
             print(prepared_data.head())
             print(prepared_data.shape)
-            prepared_data.to_csv(f'C:\\travail\\Sherbrooke\\ScienceDesDonnees\\tp\\TP1\\TP1-IFT799\\data\\prepared_data_{class_name}.csv', index=False)
+            prepared_data.to_csv(f'basedir\\data\\prepared_data_{class_name}.csv', index=False)
         #segmentation_csv(data1)
