@@ -98,8 +98,8 @@ def separate_features_and_labels(data, label_column):
 
 
 if __name__ == "__main__":
-    data_path1="C:\\travail\\Sherbrooke\\ScienceDesDonnees\\tp\\TP1\\TP1-IFT799\\data\\data.csv"
-    data_path2="C:\\travail\\Sherbrooke\\ScienceDesDonnees\\tp\\TP1\\TP1-IFT799\\data\\labels.csv"
+    data_path1="basedir\\data\\data.csv"
+    data_path2="basedir\\data\\labels.csv"
 
     if os.path.exists(data_path1) and os.path.isfile(data_path2):
         class_list=['PRAD', 'BRCA', 'KIRC', 'COAD', 'LUAD']
@@ -113,5 +113,5 @@ if __name__ == "__main__":
             print(f"Data for class {class_name}:")
             print(prepared_data.head())
             print(prepared_data.shape)
-            prepared_data.to_csv(f'C:\\travail\\Sherbrooke\\ScienceDesDonnees\\tp\\TP1\\TP1-IFT799\\data\\prepared_data_{class_name}.csv', index=False)
+            prepared_data.to_csv(f'basedir\\data\\prepared_data_{class_name}.csv', index=False)
         #segmentation_csv(data1)
